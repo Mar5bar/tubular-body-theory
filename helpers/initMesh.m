@@ -1,17 +1,15 @@
-function [cells, lookup, numCells, neighbours] = initMesh(bounds, initXNum, initYNum, maxCells)
-    cells = zeros(6,maxCells);
-    % Lookup for indices in each cell.
-    lookup = struct();
-    lookup.XBoundLower = 1;
-    lookup.XBoundUpper = 2;
-    lookup.YBoundLower = 3;
-    lookup.YBoundUpper = 4;
-    lookup.XMid = 5;
-    lookup.YMid = 6;
+function m = initMesh(XBounds, YBounds, initXNum, initYNum, maxCells)
+
+    m = struct();
+    m.XBounds = XBounds;
+    m.YBounds = YBounds;
+    m.cells = zeros(6,maxCells);
+    % Load the indices needed for looking up particular quantities in each cell.
+    m.lookup = getLookup2D();
 
     % Form the initial discretisation.
-    XEnds = linspace(bounds.X(1), bounds.X(2), initXNum+1);
-    YEnds = linspace(bounds.Y(1), bounds.Y(2), initYNum+1);
+    XEnds = linspace(XBounds(1), XBounds(2), initXNum+1);
+    YEnds = linspace(YBounds(1), YBounds(2), initYNum+1);
     XMids = movmean(XEnds,2,'Endpoints','discard');
     YMids = movmean(YEnds,2,'Endpoints','discard');
 
@@ -22,16 +20,18 @@ function [cells, lookup, numCells, neighbours] = initMesh(bounds, initXNum, init
             
             newCell = zeros(6,1);
 
-            newCell(lookup.XBoundLower) = XEnds(Xind);
-            newCell(lookup.XBoundUpper) = XEnds(Xind+1);
-            newCell(lookup.YBoundLower) = YEnds(Yind);
-            newCell(lookup.YBoundUpper) = YEnds(Yind+1);
-            newCell(lookup.XMid) = XMids(Xind);
-            newCell(lookup.YMid) = YMids(Yind);
+            newCell(m.lookup.XBoundLower) = XEnds(Xind);
+            newCell(m.lookup.XBoundUpper) = XEnds(Xind+1);
+            newCell(m.lookup.YBoundLower) = YEnds(Yind);
+            newCell(m.lookup.YBoundUpper) = YEnds(Yind+1);
+            newCell(m.lookup.XMid) = XMids(Xind);
+            newCell(m.lookup.YMid) = YMids(Yind);
 
-            cells(:,numCells) = newCell;
+            m.cells(:,numCells) = newCell;
         end
     end
+    m.numCells = numCells;
+
     % Generate a list of neighbours for each cell.
-    neighbours = genNeighbours(cells, lookup, numCells);
+    m.neighbours = genNeighbours(m.cells, m.lookup, numCells);
 end
