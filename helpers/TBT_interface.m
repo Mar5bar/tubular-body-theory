@@ -41,10 +41,6 @@ X = @(s,phi) p.r1(s) + p.ep * p.rho(s) .* p.erho1(s,phi);
 Y = @(s,phi) p.r2(s) + p.ep * p.rho(s) .* p.erho2(s,phi);
 Z = @(s,phi) p.r3(s) + p.ep * p.rho(s) .* p.erho3(s,phi) - p.d;
 
-% Compute the dimensions of each cell.
-cellWidthS   = m.cells(m.lookup.XBoundUpper,:) - m.cells(m.lookup.XBoundLower,:);
-cellWidthPhi = m.cells(m.lookup.YBoundUpper,:) - m.cells(m.lookup.YBoundLower,:);
-
 % Construct the effective ellipsoids on each cell.
 u = zeros(m.numCells,1);
 c = zeros(m.numCells,1);
@@ -69,6 +65,10 @@ z2p = Z2p(a, alpha, u);
 % Project the current 2D mesh onto a mesh for s. We'll use this to evaluate
 % the phi-independent part of the matrix B.
 mesh1D = projectMesh(m);
+
+% Compute the s-dimensions of each cell in both the 1D and 2D mesh.
+cellWidthS1D = mesh1D.cells(mesh1D.lookup.XBoundUpper,:) - mesh1D.cells(mesh1D.lookup.XBoundLower,:);
+cellWidthS2D = m.cells(m.lookup.YBoundUpper,:) - m.cells(m.lookup.YBoundLower,:);
 
 %% Compute the averages <1/zeta_1'> and <1/zeta_2'> over phi at each s in the
 % 1D mesh.
@@ -153,6 +153,11 @@ for cellInd = 1 : m.numCells
     MT0(:,3,:,cellInd) = reshape(residual(:,3),3,mesh1D.numCells);
 end
 
+% It is worth noting that the entries of MT0 do not scale with 1D mesh, ie
+% taking a mesh with 2x as many elements does not reduce the size of the
+% elements by approximately a factor of 2; instead, the element size is
+% unchanged. Thus, we must take a weighted sum of their contributions below.
+
 %% Build the matrix corresponding to the initialisation step, initMat. This
 %% will use the precomputed values above, summing them over 1D subcells.
 initMat = zeros(3*m.numCells);
@@ -166,9 +171,10 @@ for cellInd = 1 : m.numCells
     % relevant 1D cells and sum the contributions.
     for subcellInd = mesh1D.projMap{cellInd}
         % We add up the effects of the other cells on this subcell.
+        subcellWeighting = cellWidthS1D(subcellInd) / cellWidthS2D(cellInd);
         for otherCellInd = 1 : m.numCells
             otherCellEntryRange = (1:3) + 3*(otherCellInd-1);
-            initMat(cellEntryRange, otherCellEntryRange) = initMat(cellEntryRange, otherCellEntryRange) - localContrib * MT0(:,:,subcellInd,otherCellInd);
+            initMat(cellEntryRange, otherCellEntryRange) = initMat(cellEntryRange, otherCellEntryRange) - localContrib * MT0(:,:,subcellInd,otherCellInd) * subcellWeighting;
         end
     end
 
