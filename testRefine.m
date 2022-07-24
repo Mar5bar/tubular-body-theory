@@ -36,7 +36,7 @@ drawCells(m.cells,m.lookup)
 iterCount = 0;
 while any(refMask) & m.numCells <= maxCells
 
-    [m.cells, m.numCells, m.neighbours] = refineCells(m.cells, m.lookup, m.numCells, refInds);
+    m = refineMesh(m, refInds)
 
     fs = zeros(m.numCells,1);
     for cellInd = 1 : m.numCells

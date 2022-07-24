@@ -8,4 +8,6 @@ function lookup = getLookup2D()
     lookup.YBoundUpper = 4;
     lookup.XMid = 5;
     lookup.YMid = 6;
+    lookup.XWidth = 7;
+    lookup.YWidth = 8;
 end

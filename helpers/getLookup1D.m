@@ -5,4 +5,5 @@ function lookup = getLookup1D()
     lookup.XBoundLower = 1;
     lookup.XBoundUpper = 2;
     lookup.XMid = 3;
+    lookup.XWidth = 4;
 end

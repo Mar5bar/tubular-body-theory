@@ -1,8 +1,12 @@
-function [cells, numCells, neighbours] = refineCells(cells, lookup, numCells, refInds)
+function mesh2D = refineMesh(mesh2D, refInds)
+
+    cells = mesh2D.cells;
+    lookup = mesh2D.lookup;
+    numCells = mesh2D.numCells;
 
     % For each cell in refInds, split the cell into four pieces and delete the
     % original cell.
-    newCell = zeros(6,1);
+    newCell = zeros(length(fieldnames(lookup)),1);
     for i = 1 : numel(refInds)
         ind = refInds(i);
         oldCell = cells(:,ind);
@@ -16,6 +20,8 @@ function [cells, numCells, neighbours] = refineCells(cells, lookup, numCells, re
         newCell(lookup.YBoundUpper) = oldCell(lookup.YBoundUpper);
         newCell(lookup.XMid) = mean([newCell(lookup.XBoundLower), newCell(lookup.XBoundUpper)]);
         newCell(lookup.YMid) = mean([newCell(lookup.YBoundLower), newCell(lookup.YBoundUpper)]);
+        newCell(lookup.XWidth) = newCell(lookup.XBoundUpper) - newCell(lookup.XBoundLower);
+        newCell(lookup.YWidth) = newCell(lookup.YBoundUpper) - newCell(lookup.YBoundLower);
 
         cells(:,numCells) = newCell;
 
@@ -28,6 +34,8 @@ function [cells, numCells, neighbours] = refineCells(cells, lookup, numCells, re
         newCell(lookup.YBoundUpper) = oldCell(lookup.YBoundUpper);
         newCell(lookup.XMid) = mean([newCell(lookup.XBoundLower), newCell(lookup.XBoundUpper)]);
         newCell(lookup.YMid) = mean([newCell(lookup.YBoundLower), newCell(lookup.YBoundUpper)]);
+        newCell(lookup.XWidth) = newCell(lookup.XBoundUpper) - newCell(lookup.XBoundLower);
+        newCell(lookup.YWidth) = newCell(lookup.YBoundUpper) - newCell(lookup.YBoundLower);
 
         cells(:,numCells) = newCell;
 
@@ -40,6 +48,8 @@ function [cells, numCells, neighbours] = refineCells(cells, lookup, numCells, re
         newCell(lookup.YBoundUpper) = oldCell(lookup.YMid);
         newCell(lookup.XMid) = mean([newCell(lookup.XBoundLower), newCell(lookup.XBoundUpper)]);
         newCell(lookup.YMid) = mean([newCell(lookup.YBoundLower), newCell(lookup.YBoundUpper)]);
+        newCell(lookup.XWidth) = newCell(lookup.XBoundUpper) - newCell(lookup.XBoundLower);
+        newCell(lookup.YWidth) = newCell(lookup.YBoundUpper) - newCell(lookup.YBoundLower);
 
         cells(:,numCells) = newCell;
 
@@ -52,6 +62,8 @@ function [cells, numCells, neighbours] = refineCells(cells, lookup, numCells, re
         newCell(lookup.YBoundUpper) = oldCell(lookup.YMid);
         newCell(lookup.XMid) = mean([newCell(lookup.XBoundLower), newCell(lookup.XBoundUpper)]);
         newCell(lookup.YMid) = mean([newCell(lookup.YBoundLower), newCell(lookup.YBoundUpper)]);
+        newCell(lookup.XWidth) = newCell(lookup.XBoundUpper) - newCell(lookup.XBoundLower);
+        newCell(lookup.YWidth) = newCell(lookup.YBoundUpper) - newCell(lookup.YBoundLower);
 
         cells(:,numCells) = newCell;
 
@@ -63,4 +75,8 @@ function [cells, numCells, neighbours] = refineCells(cells, lookup, numCells, re
 
     % Compute the new neighbours.
     neighbours = genNeighbours(cells, lookup, numCells);
+
+    mesh2D.cells = cells;
+    mesh2D.numCells = numCells;
+    mesh2D.neighbours = neighbours;
 end

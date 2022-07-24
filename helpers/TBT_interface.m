@@ -67,9 +67,9 @@ z2p = Z2p(a, alpha, u);
 mesh1D = projectMesh(m);
 
 % Compute the s-dimensions of each cell in both the 1D and 2D mesh.
-cellWidthS1D = mesh1D.cells(mesh1D.lookup.XBoundUpper,:) - mesh1D.cells(mesh1D.lookup.XBoundLower,:);
-cellWidthS2D = m.cells(m.lookup.XBoundUpper,:) - m.cells(m.lookup.XBoundLower,:);
-cellWidthPhi = m.cells(m.lookup.YBoundUpper,:) - m.cells(m.lookup.YBoundLower,:);
+cellWidthS1D = mesh1D.cells(mesh1D.lookup.XWidth,:);
+cellWidthS2D = m.cells(m.lookup.XWidth,:);
+cellWidthPhi = m.cells(m.lookup.YWidth,:);
 
 %% Compute the averages <1/zeta_1'> and <1/zeta_2'> over phi at each s in the
 % 1D mesh.

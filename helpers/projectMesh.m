@@ -9,10 +9,11 @@ function mesh1D = projectMesh(mesh2D)
     % Use the X boundaries of the 2D mesh to form a 1D mesh.
     XBounds = unique(mesh2D.cells([mesh2D.lookup.XBoundLower,mesh2D.lookup.XBoundUpper],1:mesh2D.numCells));
     numCells = numel(XBounds) - 1;
-    mesh1D.cells = zeros(3, numCells);
+    mesh1D.cells = zeros(4, numCells);
     mesh1D.cells(lookup.XBoundLower,:) = XBounds(1:end-1);
     mesh1D.cells(lookup.XBoundUpper,:) = XBounds(2:end);
     mesh1D.cells(lookup.XMid,:) = movmean(XBounds,2,'Endpoints','discard');
+    mesh1D.cells(lookup.XWidth,:) = mesh1D.cells(lookup.XBoundUpper,:) - mesh1D.cells(lookup.XBoundLower,:);
 
     mesh1D.lookup = lookup;
     mesh1D.numCells = numCells;
