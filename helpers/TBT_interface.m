@@ -78,7 +78,7 @@ z2pib = zeros(mesh1D.numCells,1);
 
 % Form an interpolant over all the 2D cells, which will allow us to integrate
 % even with non-uniform meshes.
-int = scatteredInterpolant(reshape(m.cells(m.lookup.XMid,1:m.numCells),[],1), reshape(m.cells(m.lookup.YMid,1:m.numCells),[],1), 1./z1p);
+int = scatteredInterpolant(reshape(m.cells(m.lookup.XMid,1:m.numCells),[],1), reshape(m.cells(m.lookup.YMid,1:m.numCells),[],1), 1./z1p, 'linear', 'nearest');
 for sInd = 1 : mesh1D.numCells
     s = mesh1D.cells(mesh1D.lookup.XMid, sInd);
     z1pib(sInd) = integral(@(phi) int(s*ones(size(phi)),phi), phiBounds(1), phiBounds(2));
@@ -135,7 +135,7 @@ for cellInd = 1 : m.numCells
     % Compute quantities that are fixed on the cell.
     s = m.cells(m.lookup.XMid, cellInd);
     T = p.t(s) .* p.t(s)';
-    Mi = T / z1p(cellInd) + (eye(3) - T) / z2p(cellInd);
+    Mi = cellWidthPhi(cellInd) * (T / z1p(cellInd) + (eye(3) - T) / z2p(cellInd));
 
     % B and BLocal are functions only of s, on the 1D mesh. We'll need to sum
     % up the contributions of any subcells of the 1D mesh that make up the
@@ -347,6 +347,7 @@ for linIndex = 1 : numEntries
             subcellWeighting = cellWidthS1D(intSubcellInd) / cellWidthS2D(intCellInd);
             BNonlocalSum = BNonlocalSum + BNonLocal(refSubcellEntryRange, intSubcellEntryRange) * subcellWeighting;
         end
+        
     end
 
     refCellEntryRange = (1:3) + 3*(refCellInd - 1);
