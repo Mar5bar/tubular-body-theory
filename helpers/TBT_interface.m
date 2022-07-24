@@ -204,7 +204,7 @@ textprogressbar('Building iterMat:')
 DQ = parallel.pool.DataQueue;
 afterEach(DQ, @nUpdateProgressbar);
 prog = 1;
-for linIndex = 1 : numEntries
+parfor linIndex = 1 : numEntries
     % Get the indices of the cells from the linear index. One cell will define
     % the integral kernel (refCellInd), whilst the other defines the range of
     % integration (intCellInd).
@@ -355,6 +355,7 @@ for linIndex = 1 : numEntries
 
     % If the reference and integration cells are the same, add in a local contribution.
     if refCellInd == intCellInd
+        sRef = m.cells(m.lookup.XMid, refCellInd);
         T = p.t(sRef) .* p.t(sRef)';
         localContrib = T * (z1p(refCellInd) - Z1(a(refCellInd),alpha(refCellInd))) + (eye(3) - T) * (z2p(refCellInd) - Z2(a(refCellInd),alpha(refCellInd))); 
         C(refCellEntryRange, intCellEntryRange) = C(refCellEntryRange, intCellEntryRange) - localContrib;
