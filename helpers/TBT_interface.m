@@ -68,7 +68,8 @@ mesh1D = projectMesh(m);
 
 % Compute the s-dimensions of each cell in both the 1D and 2D mesh.
 cellWidthS1D = mesh1D.cells(mesh1D.lookup.XBoundUpper,:) - mesh1D.cells(mesh1D.lookup.XBoundLower,:);
-cellWidthS2D = m.cells(m.lookup.YBoundUpper,:) - m.cells(m.lookup.YBoundLower,:);
+cellWidthS2D = m.cells(m.lookup.XBoundUpper,:) - m.cells(m.lookup.XBoundLower,:);
+cellWidthPhi = m.cells(m.lookup.YBoundUpper,:) - m.cells(m.lookup.YBoundLower,:);
 
 %% Compute the averages <1/zeta_1'> and <1/zeta_2'> over phi at each s in the
 % 1D mesh.
@@ -161,6 +162,7 @@ end
 %% Build the matrix corresponding to the initialisation step, initMat. This
 %% will use the precomputed values above, summing them over 1D subcells.
 initMat = zeros(3*m.numCells);
+textprogressbar('Building initMat:')
 for cellInd = 1 : m.numCells
     cellEntryRange = (1:3) + 3*(cellInd - 1);
     s = m.cells(m.lookup.XMid, cellInd);
@@ -181,189 +183,183 @@ for cellInd = 1 : m.numCells
     % Also insert the local contribution.
     initMat(cellEntryRange, cellEntryRange) = initMat(cellEntryRange, cellEntryRange) + localContrib;
 
-end
-
-
-% -------------------
-numS = 5;
-numPhi = 5;
-dphi = 2*pi/5;
-Mi = zeros(3,3,numPhi,numS,numPhi,numS);
-for j = 1:numS
-    for i = 1:numPhi
-        Mi(:,:,i,j,i,j) = (p.t(s(j)) .* p.t(s(j))')/z1p(i+5*(j-1)) +((eye(3)-p.t(s(j)) .* p.t(s(j))'))/z2p(i+5*(j-1));
-    end
-end
-
-MT0 = zeros(3,3,numS,numPhi,numS);
-for k = 1:numS
-    for l2 = 1:numPhi
-        Q1 = reshape(dphi * sum(Mi(:,1,:,:,l2,k),3),3 * numS,1);
-        Q2 = reshape(dphi * sum(Mi(:,2,:,:,l2,k),3),3 * numS,1);
-        Q3 = reshape(dphi * sum(Mi(:,3,:,:,l2,k),3),3 * numS,1);
-        
-        A0 = BLocal * [Q1, Q2, Q3];
-
-        fb = B \ A0;
-        
-        res = A0 - BLocal * fb;
-        MT0(:,1,:,l2,k) = reshape(res(:,1),3,numS);
-        MT0(:,2,:,l2,k) = reshape(res(:,2),3,numS);
-        MT0(:,3,:,l2,k) = reshape(res(:,3),3,numS);
-
-    end
-end
-
-% Construct initMat from the above.
-initMat = zeros(3*m.numCells);
-textprogressbar('Building initMat:')
-for k = 1:numS
-    for l2 = 1:numPhi % Loop through all cells.
-        for j = 1 : numS
-            T = t(s(j)) .* t(s(j))';
-            for i = 1:numPhi
-                MiContrib = (T/z1p(i,j) +((eye(3)-T)/z2p(i,j)));
-                initMat((1:3)+3 * (j-1)+3 * numS * (i-1),(1:3)+3 * (k-1)+3 * numS * (l2-1)) = MiContrib*(i==l2 && j==k) - MiContrib * MT0(:,:,j,l2,k);
-            end
-        end
-    end
-    textprogressbar(k / numS * 100)
+    textprogressbar(cellInd / m.numCells * 100)
 end
 textprogressbar('.')
 
+%% Compute the matrix iterMat needed for the iterative steps.
+iterMat = zeros(3 * m.numCells);
 
-%% Next order creation
-    
-%Create the full matrix for integral equations
-ci  = zeros(numPhi * numS * numPhi * numS,1);
-c11 = zeros(numPhi * numS * numPhi * numS,1);
-c12 = zeros(numPhi * numS * numPhi * numS,1);
-c13 = zeros(numPhi * numS * numPhi * numS,1);
-c22 = zeros(numPhi * numS * numPhi * numS,1);
-c23 = zeros(numPhi * numS * numPhi * numS,1);
-c33 = zeros(numPhi * numS * numPhi * numS,1);
+% For each cell, we'll have to integrate the contributions of all the other
+% cells. In order to parallelise this computation, we'll use more cumbersome
+% linear indexing of cells and store the results.
+% There are a total of m.numCells^2 ordered pairs.
+numEntries = m.numCells^2;
+% We'll store the results of the 23 necessary integrals per pair for later
+% use.
+computedIntegrals = zeros(23, numEntries);
 
-ciw  = zeros(numPhi * numS * numPhi * numS,1);
-c11w = zeros(numPhi * numS * numPhi * numS,1);
-c12w = zeros(numPhi * numS * numPhi * numS,1);
-c13w = zeros(numPhi * numS * numPhi * numS,1);
-c22w = zeros(numPhi * numS * numPhi * numS,1);
-c23w = zeros(numPhi * numS * numPhi * numS,1);
-c33w = zeros(numPhi * numS * numPhi * numS,1);
-
-ciwsd  = zeros(numPhi * numS * numPhi * numS,1);
-c11wsd = zeros(numPhi * numS * numPhi * numS,1);
-c12wsd = zeros(numPhi * numS * numPhi * numS,1);
-c13wsd = zeros(numPhi * numS * numPhi * numS,1);
-c22wsd = zeros(numPhi * numS * numPhi * numS,1);
-c23wsd = zeros(numPhi * numS * numPhi * numS,1);
-c33wsd = zeros(numPhi * numS * numPhi * numS,1);
-
-c13wss = zeros(numPhi * numS * numPhi * numS,1);
-c23wss = zeros(numPhi * numS * numPhi * numS,1);
-
-numEntries = numPhi * numS * numPhi * numS;
-s = linspace(-1+(ds/2),1-(ds/2),numS);
-phi = linspace(-pi+dphi/2,pi-dphi/2,numPhi);
-
-DQ = parallel.pool.DataQueue;
+% Parallel progress bar.
 textprogressbar('Building iterMat:')
+DQ = parallel.pool.DataQueue;
 afterEach(DQ, @nUpdateProgressbar);
 prog = 1;
-parfor l = 1 : numEntries 
-    [k,l2,j,i,sameCell] = getIndex(l,numS,numPhi);
+for linIndex = 1 : numEntries
+    % Get the indices of the cells from the linear index. One cell will define
+    % the integral kernel (refCellInd), whilst the other defines the range of
+    % integration (intCellInd).
+    [refCellInd, intCellInd] = getCellIndices(linIndex, m.numCells);
+
+    % To form the kernels efficiently, we precompute a range of quantities to
+    % pass to the kernel function. These are all in terms of quantities on
+    % refCellInd.
+
+    % s and phi at the midpoint of the reference cell.
+    sRef = m.cells(m.lookup.XMid, refCellInd);
+    phiRef = m.cells(m.lookup.YMid, refCellInd);
     
-    pt = phi(i);
-    st = s(j);
+    % Components of the centreline on the reference cell.
+    r1 = p.r1(sRef);
+    r2 = p.r2(sRef);
+    r3 = p.r3(sRef);
+
+    % Effective s point of the ellipsoid on the reference cell.
+    uRef = u(refCellInd);
+    r1e = @(sDummy) a(refCellInd) .* (sDummy-uRef) .* tv(refCellInd,1) + r1;
+    r2e = @(sDummy) a(refCellInd) .* (sDummy-uRef) .* tv(refCellInd,2) + r2;
+    r3e = @(sDummy) a(refCellInd) .* (sDummy-uRef) .* tv(refCellInd,3) + r3;
+
+    % Radius of the ellipsoid at s = sDummy.
+    rhoEll = @(sDummy) c(refCellInd) .* sqrt(1-sDummy.^2);
+    % Surface points on the ellipsoid.
+    XEll = @(sDummy,phiDummy) r1e(sDummy) + p.ep * rhoEll(sDummy) .* p.erho1(sRef,phiDummy);
+    YEll = @(sDummy,phiDummy) r2e(sDummy) + p.ep * rhoEll(sDummy) .* p.erho2(sRef,phiDummy);
+    ZEll = @(sDummy,phiDummy) r3e(sDummy) + p.ep * rhoEll(sDummy) .* p.erho3(sRef,phiDummy);
+    sEll = @(sDummy) uRef - sRef + sDummy;
+
+    % Define the domain of integration.
+    lowSCell = m.cells(m.lookup.XBoundLower, intCellInd);
+    uppSCell = m.cells(m.lookup.XBoundUpper, intCellInd);
+    lowPhiCell = m.cells(m.lookup.YBoundLower, intCellInd);
+    uppPhiCell = m.cells(m.lookup.YBoundUpper, intCellInd);
     
-    a2 = a(i,j);
-    t12 = tv(i,j,1);
-    t22 = tv(i,j,2);
-    t32 = tv(i,j,3);
-    r12 = r1(st);
-    r22 = r2(st);
-    r32 = r3(st);
-    c2 = c(i,j);
-    u2 = u(i,j); %effective s point of ellipsoid
-    r1e = @(s2) a2 .* (s2-u2) .* t12 +r12;
-    r2e = @(s2) a2 .* (s2-u2) .* t22 +r22;
-    r3e = @(s2) a2 .* (s2-u2) .* t32 +r32;
-    rhoe = @(s2) c2 .* sqrt(1-s2.^2);
-    Xe = @(s2,phi2) r1e(s2) + ep * rhoe(s2) .* erho1(st,phi2);
-    Ye = @(s2,phi2) r2e(s2) + ep * rhoe(s2) .* erho2(st,phi2);
-    Ze = @(s2,phi2) r3e(s2) + ep * rhoe(s2) .* erho3(st,phi2);
-    s3 = @(s2) u2-st+s2;
-    
-    % Normal contributions
+    % Free-space contributions.
+    % Define intermediate, per-thread storage.
+    toStore = zeros(23, 1);
     C = zeros(7,1);
-    if sameCell % Cell with the singularity within it
-        
-        low = max(s(k)-ds/2,-1+st-u2);
-        upp = min(s(k)+ds/2,1+st-u2);
+    if refCellInd == intCellInd 
+
+        % If we are integrating over the reference cell, there is a singularity in
+        % the domain of integration. Hence, split up the domain.
+
+        % Compute additional upper and lower bounds for the domain of
+        % integration, noting that some integrals are only over the surface
+        % of the ellipsoid.
+        lowSEll = -1 + sRef - uRef;
+        lowSThresh = max(lowSCell, lowSEll);
+
+        uppSEll = 1 + sRef - uRef;
+        uppSThresh = min(uppSCell, uppSEll);
     
-        C = C + quad2dv(@(s,phi) c1Integrand(s,phi,st,pt,u2,s3,X,Y,Z,Xe,Ye,Ze),low,st,phi(l2)-dphi/2,phi(l2)+dphi/2,'AbsTol',p.tol);
-        C = C + quad2dv(@(s,phi) c2Integrand(s,phi,st,pt,u2,s3,X,Y,Z,Xe,Ye,Ze),st,upp,phi(l2)-dphi/2,phi(l2)+dphi/2,'AbsTol',p.tol);
-        C = C + quad2dv(@(s,phi) c3Integrand(s,phi,st,pt,u2,s3,X,Y,Z,Xe,Ye,Ze),-1+st-u2,low,-pi,pi,'AbsTol',p.tol);
-        C = C + quad2dv(@(s,phi) c4Integrand(s,phi,st,pt,u2,s3,X,Y,Z,Xe,Ye,Ze),s(k)-ds/2,low,phi(l2)-dphi/2,phi(l2)+dphi/2,'AbsTol',p.tol);
-        C = C + quad2dv(@(s,phi) c5Integrand(s,phi,st,pt,u2,s3,X,Y,Z,Xe,Ye,Ze),upp,1+st-u2,-pi,pi,'AbsTol',p.tol);
-        C = C + quad2dv(@(s,phi) c6Integrand(s,phi,st,pt,u2,s3,X,Y,Z,Xe,Ye,Ze),upp,s(k)+ds/2,phi(l2)-dphi/2,phi(l2)+dphi/2,'AbsTol',p.tol);
-        C = C + quad2dv(@(s,phi) c7Integrand(s,phi,st,pt,u2,s3,X,Y,Z,Xe,Ye,Ze),low,upp,-pi,phi(l2)-dphi/2,'AbsTol',p.tol);
-        C = C + quad2dv(@(s,phi) c8Integrand(s,phi,st,pt,u2,s3,X,Y,Z,Xe,Ye,Ze),low,upp,phi(l2)+dphi/2,pi,'AbsTol',p.tol);
+        C = C + quad2dv(@(s,phi) c1Integrand(s,phi,sRef,phiRef,uRef,sEll,X,Y,Z,XEll,YEll,ZEll),lowSThresh,sRef,lowPhiCell,uppPhiCell,'AbsTol',p.tol);
+        C = C + quad2dv(@(s,phi) c2Integrand(s,phi,sRef,phiRef,uRef,sEll,X,Y,Z,XEll,YEll,ZEll),sRef,uppSThresh,lowPhiCell,uppPhiCell,'AbsTol',p.tol);
+        C = C + quad2dv(@(s,phi) c3Integrand(s,phi,sRef,phiRef,uRef,sEll,X,Y,Z,XEll,YEll,ZEll),lowSEll,lowSThresh,phiBounds(1),phiBounds(2),'AbsTol',p.tol);
+        C = C + quad2dv(@(s,phi) c4Integrand(s,phi,sRef,phiRef,uRef,sEll,X,Y,Z,XEll,YEll,ZEll),lowSCell,lowSThresh,lowPhiCell,uppPhiCell,'AbsTol',p.tol);
+        C = C + quad2dv(@(s,phi) c5Integrand(s,phi,sRef,phiRef,uRef,sEll,X,Y,Z,XEll,YEll,ZEll),uppSThresh,uppSEll,phiBounds(1),phiBounds(2),'AbsTol',p.tol);
+        C = C + quad2dv(@(s,phi) c6Integrand(s,phi,sRef,phiRef,uRef,sEll,X,Y,Z,XEll,YEll,ZEll),uppSThresh,uppSCell,lowPhiCell,uppPhiCell,'AbsTol',p.tol);
+        C = C + quad2dv(@(s,phi) c7Integrand(s,phi,sRef,phiRef,uRef,sEll,X,Y,Z,XEll,YEll,ZEll),lowSThresh,uppSThresh,phiBounds(1),lowPhiCell,'AbsTol',p.tol);
+        C = C + quad2dv(@(s,phi) c8Integrand(s,phi,sRef,phiRef,uRef,sEll,X,Y,Z,XEll,YEll,ZEll),lowSThresh,uppSThresh,uppPhiCell,phiBounds(2),'AbsTol',p.tol);
 
-    else % If there is no singularity within the cell we can evaluate the terms directly
+    else
 
-        integrand = @(x,y) cStokesletIntegrand(x,y,st,pt,X,Y,Z,Xe,Ye,Ze);
-        C = quad2dv(integrand,s(k)-ds/2,s(k)+ds/2,phi(l2)-dphi/2,phi(l2)+dphi/2,'AbsTol',p.tol);
-        
+        % The integration and reference cells are distinct, so the integrand is regular.
+        integrand = @(x,y) cStokesletIntegrand(x,y,sRef,phiRef,X,Y,Z,XEll,YEll,ZEll);
+        C = quad2dv(integrand,lowSCell,uppSCell,lowPhiCell,uppPhiCell,'AbsTol',p.tol);
+
     end
+    
+    % Contributions due to the boundary.
+    integrand = @(x,y) CWallIntegrand(x,y,sRef,phiRef,X,Y,Z,XEll,YEll,ZEll);
+    D = quad2dv(integrand,lowSCell,uppSCell,lowPhiCell,uppPhiCell,'AbsTol',p.tol); 
 
-    ci(l)  = C(1);
-    c11(l) = C(2);
-    c12(l) = C(3);
-    c13(l) = C(4);
-    c22(l) = C(5);
-    c23(l) = C(6);
-    c33(l) = C(7);
-    
-    % INTERFACE CONTRIBUTIONS
-    integrand = @(x,y) CWallIntegrand(x,y,st,pt,X,Y,Z,Xe,Ye,Ze);
-    D = quad2dv(integrand,s(k)-ds/2,s(k)+ds/2,phi(l2)-dphi/2,phi(l2)+dphi/2,'AbsTol',p.tol); 
-    ciw(l)    = D(1);
-    c11w(l)   = D(2);
-    c12w(l)   = D(3);
-    c13w(l)   = D(4);
-    c22w(l)   = D(5);
-    c23w(l)   = D(6);
-    c33w(l)   = D(7);
-    ciwsd(l)  = D(8);
-    c11wsd(l) = D(9);
-    c12wsd(l) = D(10);
-    c13wsd(l) = D(11);
-    c22wsd(l) = D(12);
-    c23wsd(l) = D(13);
-    c33wsd(l) = D(14);
-    c13wss(l) = D(15);
-    c23wss(l) = D(16);
-    
-    send(DQ, l);
+    % Store the computed integrals. This data structure is cumbersome, but
+    % efficient. The indices are as follows, in terms of original variable
+    % names:
+    % 1  : ci
+    % 2  : c11
+    % 3  : c12
+    % 4  : c13
+    % 5  : c22
+    % 6  : c23
+    % 7  : c33
+    % 8  : ciw
+    % 9  : c11w
+    % 10 : c12w
+    % 11 : c13w
+    % 12 : c22w
+    % 13 : c23w
+    % 14 : c33w
+    % 15 : ciwsd
+    % 16 : c11wsd
+    % 17 : c12wsd
+    % 18 : c13wsd
+    % 19 : c22wsd
+    % 20 : c23wsd
+    % 21 : c33wsd
+    % 22 : c13wss
+    % 23 : c23wss
+
+    toStore(1:7) = C(1:7);
+    toStore(8:23) = D(1:16);
+    computedIntegrals(:,linIndex) = toStore;
+
+    send(DQ, linIndex);
 end
 textprogressbar('.')
 
-%% CONSTRUCTING MATRIX SYSTEM.
-C = zeros(3 * numS * numPhi,3 * numS * numPhi); %Construct the matrix C
+% Use the computed values to construct the actual matrix. We'll do this via an
+% intermediate, redefining C from above.
+C = zeros(3 * m.numCells);
+for linIndex = 1 : numEntries
+    % Get the indices of the cells from the linear index. One cell will define
+    % the integral kernel (refCellInd), whilst the other defines the range of
+    % integration (intCellInd).
+    [refCellInd, intCellInd] = getCellIndices(linIndex, m.numCells);
+    cI = computedIntegrals(:,linIndex);
 
-for l = 1 : numEntries
-    [k,l2,j,i,sameCell] = getIndex(l, numS, numPhi);
-    
-    CS =ci(l) * eye(3) +[c11(l) c12(l) c13(l); c12(l) c22(l) c23(l); c13(l) c23(l) c33(l)];
-    CSm =(ciw(l) * eye(3) +[c11w(l) c12w(l) c13w(l); c12w(l) c22w(l) c23w(l); c13w(l) c23w(l) c33w(l)]) * Bmat;
-    CSDm = -lambda2 * (ciwsd(l) * eye(3) -3 * [c11wsd(l) c12wsd(l) c13wsd(l); c12wsd(l) c22wsd(l) c23wsd(l); c13wsd(l) c23wsd(l) c33wsd(l)]) * Amat;
-    CSSm = -lambda2 * [0,0,c13wss(l);0,0,c23wss(l); -c13wss(l),-c23wss(l),0] * Amat;
-% BNonlocal will need its indexing adjusted - it current indexes into s values, but these need mapping via sUniqueMid.
-    C((1:3)+3 * (j-1)+3 * numS * (i-1),(1:3)+3 * (k-1)+3 * numS * (l2-1)) = CS -BNonlocal(((1:3)+(j-1) * 3),((1:3)+(k-1) * 3)) * dphi+CSm+CSDm+CSSm;
-    if sameCell
-        C((1:3)+3 * (j-1)+3 * numS * (i-1),(1:3)+3 * (k-1)+3 * numS * (l2-1)) = C((1:3)+3 * (j-1)+3 * numS * (i-1),(1:3)+3 * (k-1)+3 * numS * (l2-1)) -( (t(s(j)) .* t(s(j))') * (z1p(i,j)-Z1(a(i,j),alpha(i,j))) +((eye(3)-t(s(j)) .* t(s(j))')) * (z2p(i,j)-Z2(a(i,j),alpha(i,j))));
+    % Construct some further intermediates.
+    CS = cI(1) * eye(3) + symmMat(cI(2:7),3);
+    CSm = (cI(8) * eye(3) + symmMat(cI(9:14),3)) * Bmat;
+    CSDm = - lambda2 * (cI(15) * eye(3) - 3 * symmMat(cI(16:21),3)) * Amat;
+    CSSm = - lambda2 * [0,0,cI(22); 0,0,cI(23); -cI(22), -cI(23),0] * Amat;
+
+    % We need to sum up the contributions of various 1D subcells from
+    % BNonlocal. We need to add up the subcells of both the reference cell
+    % and the integration cell, weighting the contributions of the
+    % integration subcells.
+    BNonlocalSum = zeros(3);
+    for refSubcellInd = mesh1D.projMap{refCellInd}
+        refSubcellEntryRange = (1:3) + 3*(refSubcellInd - 1);
+
+        for intSubcellInd = mesh1D.projMap{intCellInd}
+            intSubcellEntryRange = (1:3) + 3*(intSubcellInd - 1);
+            % Define the weighting factor of the integration subcell.
+            subcellWeighting = cellWidthS1D(intSubcellInd) / cellWidthS2D(intCellInd);
+            BNonlocalSum = BNonlocalSum + BNonLocal(refSubcellEntryRange, intSubcellEntryRange) * subcellWeighting;
+        end
     end
+
+    refCellEntryRange = (1:3) + 3*(refCellInd - 1);
+    intCellEntryRange = (1:3) + 3*(intCellInd - 1);
+    C(refCellEntryRange, intCellEntryRange) = CS - BNonlocalSum * cellWidthPhi(intCellInd) + CSm + CSDm + CSSm;
+
+    % If the reference and integration cells are the same, add in a local contribution.
+    if refCellInd == intCellInd
+        T = p.t(sRef) .* p.t(sRef)';
+        localContrib = T * (z1p(refCellInd) - Z1(a(refCellInd),alpha(refCellInd))) + (eye(3) - T) * (z2p(refCellInd) - Z2(a(refCellInd),alpha(refCellInd))); 
+        C(refCellEntryRange, intCellEntryRange) = C(refCellEntryRange, intCellEntryRange) - localContrib;
+    end
+
 end
 
 % Form the iterMat from the above.
