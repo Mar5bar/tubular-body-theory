@@ -86,19 +86,27 @@ mesh2D = initMesh(sBounds, phiBounds, initSNum, initPhiNum, cellsToAllocate);
 % We'll iteratively refine the coarse mesh to generate smooth approximations to f.
 numRefs = -1;
 refMask = [];
+meshes = {};
+meshes{1} = mesh2D;
+Rs = {};
+fTotals = {};
 while (numRefs < maxRefs && any(refMask)) || numRefs == -1
 
     % If this isn't the first pass, refine the mesh.
     if numRefs >= 0
         mesh2D = refineMesh(mesh2D, refInds);
+        meshes{numRefs+2} = mesh2D;
     end
 
     % Compute the matrices needed for finding f.
     [initMat, iterMat] = TBT_interface(params,mesh2D);
-    [Rs,fs,fsTotal] = Rmat(params,mesh2D,initMat,iterMat);
+    [R,f,fTotal] = Rmat(params,mesh2D,initMat,iterMat);
+    Rs{numRefs+2} = R(:,:,end);
+    fTotals{numRefs+2} = fTotal{end};
 
     % Test, via fsTotal, if we need to refine the mesh.
-    [refMask, refInds] = refinementNeeded(fsTotal{end}, mesh2D.neighbours, params.refThresh);
+    [refMask, refInds] = refinementNeeded(fTotal{end}, mesh2D.neighbours, params.refThresh);
 
     numRefs = numRefs + 1;
+
 end
