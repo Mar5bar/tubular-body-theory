@@ -10,7 +10,7 @@ R = zeros(6, 6, p.numIter + 1);
 % Define the surface of the body.
 X = @(s,phi) p.r1(s) + p.ep * p.rho(s) .* p.erho1(s,phi);
 Y = @(s,phi) p.r2(s) + p.ep * p.rho(s) .* p.erho2(s,phi);
-Z = @(s,phi) p.r3(s) + p.ep * p.rho(s) .* p.erho3(s,phi) - p.d;
+Z = @(s,phi) p.r3(s) + p.ep * p.rho(s) .* p.erho3(s,phi);
 
 
 % The evaluation points (s,phi) are as stored in the mesh.
