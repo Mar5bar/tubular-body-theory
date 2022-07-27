@@ -21,12 +21,12 @@ pos = [X(s,phi); Y(s,phi); Z(s,phi)];
 
 % Define the surface velocity in the six cases, stored as columns of a matrix.
 V = zeros(3 * m.numCells, 6);
-V(:,1) = repmat([1;0;0], numel(s), 1);
-V(:,2) = repmat([0;1;0], numel(s), 1);
-V(:,3) = repmat([0;0;1], numel(s), 1);
-V(:,4) = reshape(cross(repmat([1;0;0],1,numel(s)), pos), [], 1);
-V(:,5) = reshape(cross(repmat([0;1;0],1,numel(s)), pos), [], 1);
-V(:,6) = reshape(cross(repmat([0;0;1],1,numel(s)), pos), [], 1);
+V(:,1) = repmat([1;0;0], m.numCells, 1);
+V(:,2) = repmat([0;1;0], m.numCells, 1);
+V(:,3) = repmat([0;0;1], m.numCells, 1);
+V(:,4) = reshape(cross(repmat([1;0;0],1,m.numCells), pos), [], 1);
+V(:,5) = reshape(cross(repmat([0;1;0],1,m.numCells), pos), [], 1);
+V(:,6) = reshape(cross(repmat([0;0;1],1,m.numCells), pos), [], 1);
 V = 8*pi * V;
 
 % Compute the initial solution for f.
