@@ -64,7 +64,7 @@ params.d = d;
 params.lambda = lambda;
 params.tol = tol;
 params.numIter = numIter;
-params.refThresh = 0.25;
+params.refThresh = refThresh;
 
 %% Generate an initial mesh of cells.
 % Bounds on S and Phi.
