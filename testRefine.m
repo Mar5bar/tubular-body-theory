@@ -31,7 +31,7 @@ scatter3(m.cells(m.lookup.XMid,1:m.numCells), m.cells(m.lookup.YMid,1:m.numCells
 scatter3(m.cells(m.lookup.XMid,refInds), m.cells(m.lookup.YMid,refInds), fs(refInds), [], fs(refInds), 'MarkerEdgeColor','black','LineWidth',3)
 colormap(viridis)
 view(0,90)
-drawCells(m.cells,m.lookup)
+drawCells(m)
 
 iterCount = 0;
 while any(refMask) & m.numCells <= maxCells
@@ -53,7 +53,7 @@ while any(refMask) & m.numCells <= maxCells
     scatter3(m.cells(m.lookup.XMid,refInds), m.cells(m.lookup.YMid,refInds), fs(refInds), [], fs(refInds), 'MarkerEdgeColor','black','LineWidth',3)
     colormap(viridis)
     view(0,90)
-    drawCells(m.cells,m.lookup)
+    drawCells(m)
 
 end
 
