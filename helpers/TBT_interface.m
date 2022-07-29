@@ -335,24 +335,28 @@ for linIndex = 1 : numEntries
 
     % We need to sum up the contributions of various 1D subcells from
     % BNonlocal. We need to add up the subcells of both the reference cell
-    % and the integration cell, weighting the contributions of the
-    % integration subcells.
+    % and the integration cell, weighting the contributions to the reference 
+    % subcells.
     BNonlocalSum = zeros(3);
     for refSubcellInd = mesh1D.projMap{refCellInd}
         refSubcellEntryRange = (1:3) + 3*(refSubcellInd - 1);
+        subcellWeighting = cellWidthS1D(refSubcellInd) / cellWidthS2D(refCellInd);
 
         for intSubcellInd = mesh1D.projMap{intCellInd}
             intSubcellEntryRange = (1:3) + 3*(intSubcellInd - 1);
-            % Define the weighting factor of the integration subcell.
-            subcellWeighting = cellWidthS1D(intSubcellInd) / cellWidthS2D(intCellInd);
+            
+            % BNonLocal already scales with ds as it is an integral, so we
+            % don't need to weight it by anything specific to the
+            % integration subcell.
             BNonlocalSum = BNonlocalSum + BNonLocal(refSubcellEntryRange, intSubcellEntryRange) * subcellWeighting;
+
         end
         
     end
 
     refCellEntryRange = (1:3) + 3*(refCellInd - 1);
     intCellEntryRange = (1:3) + 3*(intCellInd - 1);
-    C(refCellEntryRange, intCellEntryRange) = CS - BNonlocalSum * cellWidthPhi(intCellInd) + CSm + CSDm + CSSm;
+    C(refCellEntryRange, intCellEntryRange) = CS + CSm + CSDm + CSSm - BNonlocalSum * cellWidthPhi(intCellInd);
 
     % If the reference and integration cells are the same, add in a local contribution.
     if refCellInd == intCellInd
