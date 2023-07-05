@@ -2,7 +2,7 @@ addpath(genpath('helpers'))
 %% Setup
 
 % Maximum number of mesh refinements.
-maxRefs = 5;
+maxRefs = 0;
 
 % Threshold for refinement. Lower leads to more refinement.
 refThresh = 0.25;
@@ -72,8 +72,8 @@ sBounds = [-1,1];
 phiBounds = [0,2*pi];
 
 % Initial number of cells in the S and Phi coordinates..
-initSNum = 5;
-initPhiNum = 4;
+initSNum = 20;
+initPhiNum = 10;
 
 % Number of cells to allocate initially.
 cellsToAllocate = 1e3;
